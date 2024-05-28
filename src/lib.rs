@@ -15,14 +15,14 @@ pub fn validate_file(path: impl AsRef<Path>, directory: bool, exists: bool) -> R
 			anyhow::bail!("File {path:?} already exists.")
 		};
 	}
-	if exists == true && path.is_dir() != directory {
+	if exists && path.is_dir() != directory {
 		if directory {
 			anyhow::bail!("File {path:?} should not be a directory.")
 		} else {
 			anyhow::bail!("File {path:?} should be a directory.")
 		};
 	}
-	Ok(path.canonicalize()?)
+	if exists { Ok(path.canonicalize()?) } else { Ok(path.to_path_buf()) }
 }
 #[inline(always)]
 pub fn mount_bind(from: impl AsRef<Path>, to: impl AsRef<Path>) -> Result<Mount> {
