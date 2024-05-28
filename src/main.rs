@@ -7,24 +7,16 @@ use anyhow::Result;
 use flate2::bufread::GzDecoder;
 use loopdev::{LoopControl, LoopDevice};
 use std::{
-	fs::{create_dir, metadata, read_to_string, remove_file, write, File},
-	io::{copy, BufReader, BufWriter, Seek},
+	fs::{create_dir, read_to_string, remove_file, write, File},
+	io::{copy, BufReader, BufWriter},
 	path::Path,
 	process::{Command, Stdio},
-	sync::mpsc::channel,
-	thread::{sleep, spawn},
-	time::Duration,
 };
 use sys_mount::{unmount, Unmount, UnmountFlags};
 use tar::Archive;
-use unbytify::unbytify;
+use unbytify::{bytify, unbytify};
 use ureq::get;
 use url::Url;
-
-enum SendMessage {
-	Complete,
-	Percent(u64),
-}
 
 fn install(
 	root_size: impl AsRef<str>, url_tar_rootfs: Option<Url>, path_tar_rootfs: impl AsRef<Path>,
@@ -43,12 +35,11 @@ fn install(
 		let url_path = "filename=".to_owned() + url_rootfs.path_segments().unwrap().last().unwrap();
 		let file_name =
 			request.header("Content-Disposition").unwrap_or(&url_path).split("filename=").last().unwrap();
-		println!("{file_name}");
-		let file_size_bytes: u64 = request.header("Content-Length").unwrap().parse()?;
+		let (file_size, ext) = bytify(request.header("Content-Length").unwrap().parse()?);
 		path_tar_rootfs = root_path.parent().unwrap().join(file_name);
 		let path = path_tar_rootfs.clone();
 		let mut tar = File::create(&path)?;
-		println!("Downloading: {file_name}, {file_size_bytes} bytes.");
+		println!("Downloading: {file_name}, {file_size}{ext}.");
 		copy(&mut request.into_reader(), &mut BufWriter::new(&mut tar))?;
 	}
 	let tar_gz = BufReader::new(File::open(path_tar_rootfs)?);
@@ -71,6 +62,7 @@ fn install(
 	archive.unpack(&root_path)?;
 	create_dir(root_path.join("sdcard"))?;
 	mount.unmount(UnmountFlags::EXPIRE)?;
+	// mount
 	loop_device.detach()?;
 	Ok(())
 }
@@ -152,8 +144,9 @@ fn start(
 fn main() -> Result<()> {
 	install(
 		"10G",
-		Some("https://fl.us.mirror.archlinuxarm.org/os/ArchLinuxARM-aarch64-latest.tar.gz".try_into()?),
-		"",
+		// Some("https://fl.us.mirror.archlinuxarm.org/os/ArchLinuxARM-aarch64-latest.tar.gz".try_into()?),
+		None,
+		"./ArchLinuxARM-aarch64-latest.tar.gz",
 		"./root",
 	)
 }
