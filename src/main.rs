@@ -34,7 +34,12 @@ fn install(
 	let img_path = validate_file(root_path.parent().unwrap().join("disk.img"), false, false)?;
 	let mut path_tar_rootfs = path_tar_rootfs.as_ref().to_path_buf();
 	if let Some(url_rootfs) = url_tar_rootfs {
-		let request = get(url_rootfs.as_ref()).call()?;
+		let request = get(url_rootfs.as_ref())
+			.set(
+				"User-Agent",
+				"Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:95.0) Gecko/20100101 Firefox/95.0",
+			)
+			.call()?;
 		let file_name =
 			request.header("Content-Disposition").unwrap().split("filename=").last().unwrap();
 		let file_size_bytes: u64 = request.header("Content-Length").unwrap().parse()?;
