@@ -26,10 +26,9 @@ fn install(
 	let root_path = validate_file(root_path, false, false)?;
 	let img_path = validate_file(root_path.parent().unwrap().join("disk.img"), false, false)?;
 	let mut path_tar_rootfs = path_tar_rootfs.as_ref().to_path_buf();
-	create_dir(&root_path)?;
 	if let Some(url_rootfs) = url_tar_rootfs {
 		let file_size_bytes: u64 =
-			Agent::new().head(url_rootfs.as_ref()).header("Content-Length").unwrap().parse()?;
+			Agent::new().get(url_rootfs.as_ref()).header("Content-Length").unwrap().parse()?;
 		path_tar_rootfs = root_path.parent().unwrap().join("rootfs.tar.gz");
 		let path = path_tar_rootfs.clone();
 		let mut tar = File::create(&path)?;
@@ -42,7 +41,6 @@ fn install(
 			println!("{}", 100 * metadata.len() / file_size_bytes);
 		}
 	}
-	// loop {}
 	let tar_gz = File::open(path_tar_rootfs)?;
 	let tar = GzDecoder::new(tar_gz);
 	let mut archive = Archive::new(tar);
@@ -57,6 +55,7 @@ fn install(
 		.spawn()?
 		.wait()?;
 	let loop_device = LoopControl::open()?.next_free()?;
+	create_dir(&root_path)?;
 	loop_device.attach_file(&img_path)?;
 	let mount = mount_fs(&img_path, &root_path, "ext4")?;
 	archive.unpack(&root_path)?;
