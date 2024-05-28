@@ -70,7 +70,7 @@ fn install(
 	};
 	archive.unpack(&root_path)?;
 	create_dir(root_path.join("sdcard"))?;
-	mount.unmount(UnmountFlags::EXPIRE)?;
+	mount.unmount(UnmountFlags::DETACH)?;
 	// Not sure what to do about the spin down time.
 	if !automounted {
 		sleep(Duration::from_millis(400));
