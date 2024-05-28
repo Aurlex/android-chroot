@@ -29,7 +29,7 @@ fn install(
 	create_dir(&root_path)?;
 	if let Some(url_rootfs) = url_tar_rootfs {
 		let file_size_bytes: u64 =
-			Agent::new().head(url_rootfs.as_ref()).header("content-length").unwrap().parse()?;
+			Agent::new().head(url_rootfs.as_ref()).header("Content-Length").unwrap().parse()?;
 		path_tar_rootfs = root_path.parent().unwrap().join("rootfs.tar.gz");
 		let path = path_tar_rootfs.clone();
 		let mut tar = File::create(&path)?;
