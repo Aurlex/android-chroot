@@ -1,20 +1,24 @@
 use std::fs::{read_to_string, ReadDir};
 use std::io::{Error, ErrorKind, Result};
 use std::path::{Path, PathBuf};
-use sys_mount::{Mount, SupportedFilesystems};
+use sys_mount::{Mount, MountFlags, SupportedFilesystems};
 
 mod config;
+pub use config::*;
 
 #[cfg(test)]
 mod tests;
 
 #[inline(always)]
-pub fn validate_file(path: impl AsRef<Path>, directory: bool) -> Result<PathBuf> {
+pub fn validate_file(path: impl AsRef<Path>, directory: bool, exists: bool) -> Result<PathBuf> {
 	let path = path.as_ref().canonicalize()?;
-	if !path.try_exists()? {
+	if path.try_exists()? != exists {
 		return Err(Error::new(
 			ErrorKind::NotFound,
-			format!("File \"{path:?}\" not found."),
+			format!(
+				"File \"{path:?}\" {}found.",
+				if directory { "not " } else { "" }
+			),
 		));
 	}
 	if path.is_dir() != directory {
@@ -30,11 +34,11 @@ pub fn validate_file(path: impl AsRef<Path>, directory: bool) -> Result<PathBuf>
 }
 #[inline(always)]
 pub fn ls(path: impl AsRef<Path>) -> Result<ReadDir> {
-	validate_file(path, true)?.read_dir()
+	validate_file(path, true, true)?.read_dir()
 }
 #[inline(always)]
 pub fn cat(path: impl AsRef<Path>) -> Result<String> {
-	read_to_string(validate_file(path, false)?)
+	read_to_string(validate_file(path, false, true)?)
 }
 #[inline(always)]
 pub fn mount_loopback(
@@ -42,8 +46,8 @@ pub fn mount_loopback(
 	to: impl AsRef<Path>,
 	fstype: impl AsRef<str>,
 ) -> Result<Mount> {
-	let from = validate_file(from, false)?;
-	let to = validate_file(to, true)?;
+	let from = validate_file(from, false, true)?;
+	let to = validate_file(to, true, true)?;
 	if !SupportedFilesystems::new()?.is_supported(fstype.as_ref()) {
 		return Err(Error::new(
 			ErrorKind::Unsupported,
@@ -54,4 +58,26 @@ pub fn mount_loopback(
 		.fstype(fstype.as_ref())
 		.explicit_loopback()
 		.mount(from, to)
+}
+#[inline(always)]
+pub fn mount_bind(from: impl AsRef<Path>, to: impl AsRef<Path>) -> Result<Mount> {
+	let from = validate_file(from, false, true)?;
+	let to = validate_file(to, true, true)?;
+	Mount::builder().flags(MountFlags::BIND).mount(from, to)
+}
+#[inline(always)]
+pub fn mount_fs(
+	from: impl AsRef<Path>,
+	to: impl AsRef<Path>,
+	fstype: impl AsRef<str>,
+) -> Result<Mount> {
+	let from = validate_file(from, false, true)?;
+	let to = validate_file(to, true, true)?;
+	if !SupportedFilesystems::new()?.is_supported(fstype.as_ref()) {
+		return Err(Error::new(
+			ErrorKind::Unsupported,
+			format!("Filesystem \"{}\" is unsupported", fstype.as_ref()),
+		));
+	}
+	Mount::builder().fstype(fstype.as_ref()).mount(from, to)
 }

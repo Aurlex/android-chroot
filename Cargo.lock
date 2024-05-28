@@ -19,6 +19,7 @@ dependencies = [
  "serde",
  "sys-mount",
  "toml",
+ "unbytify",
  "url",
 ]
 
@@ -81,7 +82,7 @@ dependencies = [
  "cexpr",
  "clang-sys",
  "itertools",
- "lazy_static",
+ "lazy_static 1.4.0",
  "lazycell",
  "proc-macro2",
  "quote",
@@ -252,6 +253,12 @@ checksum = "ba291022dbbd398a455acf126c1e341954079855bc60dfdda641363bd6922569"
 dependencies = [
  "either",
 ]
+
+[[package]]
+name = "lazy_static"
+version = "0.2.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "76f033c7ad61445c5b347c7382dd1237847eb1bce590fe50365dcb33d546be73"
 
 [[package]]
 name = "lazy_static"
@@ -560,6 +567,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c06d3da6113f116aaee68e4d601191614c9053067f9ab7f6edbcb161237daa54"
 dependencies = [
  "once_cell",
+]
+
+[[package]]
+name = "unbytify"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "61f431354fd60c251d35ccc3d3ecf14e5f37e52ce807f6436f394fb3f0fc9869"
+dependencies = [
+ "lazy_static 0.2.11",
 ]
 
 [[package]]

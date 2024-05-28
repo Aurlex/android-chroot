@@ -11,3 +11,4 @@ serde = { version = "1", features = ["derive"] }
 clap = { version = "4", features = ["derive"] }
 toml = "0.8"
 url = { version = "2", features = ["serde"] }
+unbytify = "0.2.0"
