@@ -57,17 +57,24 @@ fn install(
 		.stdout(Stdio::null())
 		.spawn()?
 		.wait()?;
-	let loop_device = LoopControl::open()?.next_free()?;
 	create_dir(&root_path)?;
-	loop_device.attach_file(&img_path)?;
+	// loop_device.attach_file(&img_path)?;
 	let mount = mount_fs(&img_path, &root_path, "ext4")?;
+	// let loop_device = mount.backing_loop_device().unwrap();
+	let loop_device = if mount.backing_loop_device().is_none() {
+		let loop_device = LoopControl::open()?.next_free()?;
+		loop_device.attach_file(&img_path)?;
+		loop_device
+	} else {
+		LoopDevice::open(mount.backing_loop_device().unwrap())?
+	};
 	archive.unpack(&root_path)?;
 	create_dir(root_path.join("sdcard"))?;
-	mount.unmount(UnmountFlags::EXPIRE)?;
+	mount.unmount(UnmountFlags::DETACH)?;
 	// Not sure what to do about the spin down time.
-	sleep(Duration::from_millis(100));
+	sleep(Duration::from_millis(200));
 	mount.unmount(UnmountFlags::EXPIRE)?;
-	sleep(Duration::from_millis(100));
+	sleep(Duration::from_millis(200));
 	loop_device.detach()?;
 	Ok(())
 }
