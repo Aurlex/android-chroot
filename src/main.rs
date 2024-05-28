@@ -27,13 +27,13 @@ fn install(
 	let img_path = validate_file(root_path.parent().unwrap().join("disk.img"), false, false)?;
 	let mut path_tar_rootfs = path_tar_rootfs.as_ref().to_path_buf();
 	if let Some(url_rootfs) = url_tar_rootfs {
-		let file_size_bytes: u64 =
-			ureq::head(url_rootfs.as_ref()).header("content-length").unwrap().parse()?;
 		path_tar_rootfs = root_path.parent().unwrap().join("rootfs.tar.gz");
 		let path = path_tar_rootfs.clone();
 		let mut tar = File::create(&path)?;
+		let request = get(url_rootfs.as_ref()).call()?;
+		let file_size_bytes: u64 = request.header("Content-Length").unwrap().parse()?;
 		let handle = spawn(move || -> Result<()> {
-			copy(&mut get(url_rootfs.as_ref()).call()?.into_reader(), &mut tar)?;
+			copy(&mut request.into_reader(), &mut tar)?;
 			Ok(())
 		});
 		let metadata = metadata(&path)?;
