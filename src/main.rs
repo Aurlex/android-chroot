@@ -24,8 +24,8 @@ fn install(
 	root_size: impl AsRef<str>, url_tar_rootfs: Option<Url>, path_tar_rootfs: impl AsRef<Path>,
 	root_path: impl AsRef<Path>,
 ) -> Result<()> {
-	let root_path = validate_file(root_path, false, false)?;
-	let img_path = validate_file(root_path.parent().unwrap().join("disk.img"), false, false)?;
+	let root_path = validate_file(root_path, Some(false), false)?;
+	let img_path = validate_file(root_path.parent().unwrap().join("disk.img"), Some(false), false)?;
 	let mut path_tar_rootfs = path_tar_rootfs.as_ref().to_path_buf();
 	if let Some(url_rootfs) = url_tar_rootfs {
 		let request = get(url_rootfs.as_ref())
@@ -81,17 +81,17 @@ fn install(
 
 // TODO: this
 fn resize(new_size: impl AsRef<str>, root_path: impl AsRef<Path>) -> Result<()> {
-	let root_path = validate_file(root_path, true, true)?;
-	let img_path = validate_file(root_path.parent().unwrap().join("disk.img"), false, true)?;
+	let root_path = validate_file(root_path, Some(true), true)?;
+	let img_path = validate_file(root_path.parent().unwrap().join("disk.img"), Some(false), true)?;
 	let new_size = unbytify(new_size.as_ref())?;
-	validate_file(root_path.parent().unwrap().join("loopdevice.lock"), false, false)?;
+	validate_file(root_path.parent().unwrap().join("loopdevice.lock"), Some(false), false)?;
 
 	Ok(())
 }
 
 fn mount(root_path: impl AsRef<Path>) -> Result<bool> {
-	let root_path = validate_file(root_path, true, true)?;
-	let img_path = validate_file(root_path.parent().unwrap().join("disk.img"), false, true)?;
+	let root_path = validate_file(root_path, Some(true), true)?;
+	let img_path = validate_file(root_path.parent().unwrap().join("disk.img"), Some(false), true)?;
 	let mount = mount_loop(&img_path, &root_path, "ext4")?;
 	let (loop_device, automounted) = if mount.backing_loop_device().is_none() {
 		let loop_device = LoopControl::open()?.next_free()?;
@@ -114,7 +114,7 @@ fn mount(root_path: impl AsRef<Path>) -> Result<bool> {
 }
 
 fn umount(root_path: impl AsRef<Path>, automounted: bool) -> Result<()> {
-	let root_path = validate_file(root_path, true, true)?;
+	let root_path = validate_file(root_path, Some(true), true)?;
 	unmount(&root_path.join("sdcard"), UnmountFlags::DETACH)?;
 	unmount(&root_path.join("dev/pts"), UnmountFlags::DETACH)?;
 	unmount(&root_path.join("tmp"), UnmountFlags::DETACH)?;
@@ -135,9 +135,9 @@ fn umount(root_path: impl AsRef<Path>, automounted: bool) -> Result<()> {
 fn start(
 	root_path: impl AsRef<Path>, user: impl AsRef<str>, shell: impl AsRef<Path>,
 ) -> Result<()> {
-	let root_path = validate_file(root_path, true, true)?;
+	let root_path = validate_file(root_path, Some(true), true)?;
 	let automounted = mount(&root_path)?;
-	validate_file(root_path.join(shell.as_ref().strip_prefix("/")?), false, true)?;
+	validate_file(root_path.join(shell.as_ref().strip_prefix("/")?), Some(false), true)?;
 	Command::new("unshare")
 		.env_clear()
 		.env("TERM", "xterm-256color")
