@@ -23,7 +23,7 @@ fn install(
 	root_size: impl AsRef<str>, url_tar_rootfs: Option<Url>, path_tar_rootfs: impl AsRef<Path>,
 	root_path: impl AsRef<Path>,
 ) -> Result<()> {
-	let root_path = validate_file(root_path, true, false)?;
+	let root_path = validate_file(root_path, false, false)?;
 	let img_path = validate_file(root_path.parent().unwrap().join("disk.img"), false, false)?;
 	let mut path_tar_rootfs = path_tar_rootfs.as_ref().canonicalize()?;
 	create_dir(&root_path)?;
