@@ -1,7 +1,7 @@
 // #[cfg(not(any(target_os = "android", debug_assertions)))]
 // compile_error!("Only android is supported");
 
-use android_chroot::{mount_bind, mount_fs, validate_file /* , Arguments */};
+use android_chroot::{mount_bind, mount_fs, mount_loop, validate_file /* , Arguments */};
 use anyhow::Result;
 // use clap::Parser;
 use flate2::bufread::GzDecoder;
@@ -59,7 +59,7 @@ fn install(
 		.wait()?;
 	create_dir(&root_path)?;
 	// loop_device.attach_file(&img_path)?;
-	let mount = mount_fs(&img_path, &root_path, "ext4")?;
+	let mount = mount_loop(&img_path, &root_path, "ext4")?;
 	// let loop_device = mount.backing_loop_device().unwrap();
 	let (loop_device, automounted) = if mount.backing_loop_device().is_none() {
 		let loop_device = LoopControl::open()?.next_free()?;
@@ -70,7 +70,7 @@ fn install(
 	};
 	archive.unpack(&root_path)?;
 	create_dir(root_path.join("sdcard"))?;
-	mount.unmount(UnmountFlags::DETACH)?;
+	mount.unmount(UnmountFlags::EXPIRE)?;
 	// Not sure what to do about the spin down time.
 	if !automounted {
 		sleep(Duration::from_millis(400));

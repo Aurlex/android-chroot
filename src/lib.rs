@@ -25,6 +25,20 @@ pub fn validate_file(path: impl AsRef<Path>, directory: bool, exists: bool) -> R
 	if exists { Ok(path.canonicalize()?) } else { Ok(path.to_path_buf()) }
 }
 #[inline(always)]
+pub fn mount_loop(
+	from: impl AsRef<Path>, to: impl AsRef<Path>, fs: impl AsRef<str>,
+) -> Result<Mount> {
+	let from = validate_file(from, false, true)?;
+	let to = validate_file(to, true, true)?;
+	Ok(
+		Mount::builder()
+			.fstype(fs.as_ref())
+			.explicit_loopback()
+			.flags(MountFlags::BIND)
+			.mount(from, to)?,
+	)
+}
+#[inline(always)]
 pub fn mount_bind(from: impl AsRef<Path>, to: impl AsRef<Path>) -> Result<Mount> {
 	let from = validate_file(from, false, true)?;
 	let to = validate_file(to, true, true)?;
