@@ -13,7 +13,7 @@ anyhow = "1"
 serde = { version = "1", features = ["derive"] }
 clap = { version = "4", features = ["derive"] }
 toml = "0.8"
-ureq = { version = "2", default-features = false }
+ureq = { version = "2", default-features = false, features = ["tls"] }
 url = { version = "2", features = ["serde"] }
 tar = "0.4"
 flate2 = "1.0.30"
