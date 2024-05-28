@@ -136,8 +136,8 @@ fn start(
 	root_path: impl AsRef<Path>, user: impl AsRef<str>, shell: impl AsRef<Path>,
 ) -> Result<()> {
 	let root_path = validate_file(root_path, true, true)?;
-	validate_file(root_path.join(shell.as_ref().strip_prefix("/")?), false, true)?;
 	let automounted = mount(&root_path)?;
+	validate_file(root_path.join(shell.as_ref().strip_prefix("/")?), false, true)?;
 	Command::new("unshare")
 		.env_clear()
 		.env("TERM", "xterm-256color")
