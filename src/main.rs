@@ -16,7 +16,7 @@ use std::{
 use sys_mount::{unmount, Unmount, UnmountFlags};
 use tar::Archive;
 use unbytify::unbytify;
-use ureq::Agent;
+use ureq::get;
 use url::Url;
 
 fn install(
@@ -28,12 +28,12 @@ fn install(
 	let mut path_tar_rootfs = path_tar_rootfs.as_ref().to_path_buf();
 	if let Some(url_rootfs) = url_tar_rootfs {
 		let file_size_bytes: u64 =
-			Agent::new().get(url_rootfs.as_ref()).header("Content-Length").unwrap().parse()?;
+			get(url_rootfs.as_ref()).header("content-length").unwrap().parse()?;
 		path_tar_rootfs = root_path.parent().unwrap().join("rootfs.tar.gz");
 		let path = path_tar_rootfs.clone();
 		let mut tar = File::create(&path)?;
 		let handle = spawn(move || -> Result<()> {
-			copy(&mut Agent::new().get(url_rootfs.as_ref()).call()?.into_reader(), &mut tar)?;
+			copy(&mut get(url_rootfs.as_ref()).call()?.into_reader(), &mut tar)?;
 			Ok(())
 		});
 		let metadata = metadata(&path)?;
