@@ -4,13 +4,14 @@
 use android_chroot::{mount_bind, mount_fs, validate_file /* , Arguments */};
 use anyhow::Result;
 // use clap::Parser;
-use flate2::read::GzDecoder;
+use flate2::bufread::GzDecoder;
 use loopdev::{LoopControl, LoopDevice};
 use std::{
 	fs::{create_dir, metadata, read_to_string, remove_file, write, File},
-	io::copy,
+	io::{copy, BufReader, BufWriter, Seek},
 	path::Path,
 	process::{Command, Stdio},
+	sync::mpsc::channel,
 	thread::{sleep, spawn},
 	time::Duration,
 };
@@ -20,6 +21,11 @@ use unbytify::unbytify;
 use ureq::get;
 use url::Url;
 
+enum SendMessage {
+	Complete,
+	Percent(u64),
+}
+
 fn install(
 	root_size: impl AsRef<str>, url_tar_rootfs: Option<Url>, path_tar_rootfs: impl AsRef<Path>,
 	root_path: impl AsRef<Path>,
@@ -28,22 +34,17 @@ fn install(
 	let img_path = validate_file(root_path.parent().unwrap().join("disk.img"), false, false)?;
 	let mut path_tar_rootfs = path_tar_rootfs.as_ref().to_path_buf();
 	if let Some(url_rootfs) = url_tar_rootfs {
-		path_tar_rootfs = root_path.parent().unwrap().join("rootfs.tar.gz");
+		let request = get(url_rootfs.as_ref()).call()?;
+		let file_name =
+			request.header("Content-Disposition").unwrap().split("filename=").last().unwrap();
+		let file_size_bytes: u64 = request.header("Content-Length").unwrap().parse()?;
+		path_tar_rootfs = root_path.parent().unwrap().join(file_name);
 		let path = path_tar_rootfs.clone();
 		let mut tar = File::create(&path)?;
-		let request = get(url_rootfs.as_ref()).call()?;
-		let file_size_bytes: u64 = request.header("Content-Length").unwrap().parse()?;
-		let handle = spawn(move || -> Result<()> {
-			copy(&mut request.into_reader(), &mut tar)?;
-			Ok(())
-		});
-		while !handle.is_finished() {
-			let metadata = metadata(&path)?;
-			println!("{}", 100 * metadata.len() / file_size_bytes);
-			sleep(Duration::from_secs(1));
-		}
+		println!("Downloading: {file_name}, {file_size_bytes} bytes.");
+		copy(&mut request.into_reader(), &mut BufWriter::new(&mut tar))?;
 	}
-	let tar_gz = File::open(path_tar_rootfs)?;
+	let tar_gz = BufReader::new(File::open(path_tar_rootfs)?);
 	let tar = GzDecoder::new(tar_gz);
 	let mut archive = Archive::new(tar);
 
