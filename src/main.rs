@@ -121,7 +121,7 @@ fn umount(root_path: impl AsRef<Path>, automounted: bool) -> Result<()> {
 	unmount(&root_path.join("sys"), UnmountFlags::DETACH)?;
 	unmount(&root_path.join("proc"), UnmountFlags::DETACH)?;
 	unmount(&root_path.join("dev"), UnmountFlags::DETACH)?;
-	unmount(&root_path.join("root"), UnmountFlags::DETACH)?;
+	unmount(&root_path, UnmountFlags::DETACH)?;
 	let lock_path = root_path.parent().unwrap().join("loopdevice.lock");
 	if !automounted {
 		let loop_device = LoopDevice::open(read_to_string(&lock_path)?)?;
@@ -138,19 +138,10 @@ fn start(
 	let root_path = validate_file(root_path, Some(true), true)?;
 	let automounted = mount(&root_path)?;
 	validate_file(root_path.join(shell.as_ref().strip_prefix("/")?), Some(false), true)?;
-	Command::new("unshare")
+	Command::new("chroot")
 		.env_clear()
 		.env("TERM", "xterm-256color")
-		.args([
-			"--uts",
-			"env",
-			"-i",
-			"chroot",
-			"-u",
-			user.as_ref(),
-			root_path.to_str().unwrap(),
-			shell.as_ref().to_str().unwrap(),
-		])
+		.args(["-u", user.as_ref(), root_path.to_str().unwrap(), shell.as_ref().to_str().unwrap()])
 		.stderr(Stdio::inherit())
 		.stdin(Stdio::inherit())
 		.stdout(Stdio::inherit())
