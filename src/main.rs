@@ -89,12 +89,17 @@ fn resize(new_size: impl AsRef<str>, root_path: impl AsRef<Path>) -> Result<()> 
 	Ok(())
 }
 
-fn mount(root_path: impl AsRef<Path>) -> Result<()> {
+fn mount(root_path: impl AsRef<Path>) -> Result<bool> {
 	let root_path = validate_file(root_path, true, true)?;
 	let img_path = validate_file(root_path.parent().unwrap().join("disk.img"), false, true)?;
-	let loop_device = LoopControl::open()?.next_free()?;
-	loop_device.attach_file(&img_path)?;
-	mount_fs(&img_path, &root_path, "ext4")?;
+	let mount = mount_loop(&img_path, &root_path, "ext4")?;
+	let (loop_device, automounted) = if mount.backing_loop_device().is_none() {
+		let loop_device = LoopControl::open()?.next_free()?;
+		loop_device.attach_file(&img_path)?;
+		(loop_device, false)
+	} else {
+		(LoopDevice::open(mount.backing_loop_device().unwrap())?, true)
+	};
 	mount_bind("/dev", &root_path.join("dev"))?;
 	mount_fs("proc", &root_path.join("proc"), "proc")?;
 	mount_fs("sysfs", &root_path.join("sys"), "sysfs")?;
@@ -105,21 +110,24 @@ fn mount(root_path: impl AsRef<Path>) -> Result<()> {
 		root_path.parent().unwrap().join("loopdevice.lock"),
 		loop_device.path().unwrap().to_str().unwrap(),
 	)?;
-	Ok(())
+	Ok(automounted)
 }
 
-fn umount(root_path: impl AsRef<Path>) -> Result<()> {
+fn umount(root_path: impl AsRef<Path>, automounted: bool) -> Result<()> {
 	let root_path = validate_file(root_path, true, true)?;
-	unmount(&root_path.join("sdcard"), UnmountFlags::EXPIRE)?;
-	unmount(&root_path.join("dev/pts"), UnmountFlags::EXPIRE)?;
-	unmount(&root_path.join("tmp"), UnmountFlags::EXPIRE)?;
-	unmount(&root_path.join("sys"), UnmountFlags::EXPIRE)?;
-	unmount(&root_path.join("proc"), UnmountFlags::EXPIRE)?;
-	unmount(&root_path.join("dev"), UnmountFlags::EXPIRE)?;
-	unmount(&root_path.join("root"), UnmountFlags::EXPIRE)?;
+	unmount(&root_path.join("sdcard"), UnmountFlags::DETACH)?;
+	unmount(&root_path.join("dev/pts"), UnmountFlags::DETACH)?;
+	unmount(&root_path.join("tmp"), UnmountFlags::DETACH)?;
+	unmount(&root_path.join("sys"), UnmountFlags::DETACH)?;
+	unmount(&root_path.join("proc"), UnmountFlags::DETACH)?;
+	unmount(&root_path.join("dev"), UnmountFlags::DETACH)?;
+	unmount(&root_path.join("root"), UnmountFlags::DETACH)?;
 	let lock_path = root_path.parent().unwrap().join("loopdevice.lock");
-	let loop_device = LoopDevice::open(read_to_string(&lock_path)?)?;
-	loop_device.detach()?;
+	if !automounted {
+		let loop_device = LoopDevice::open(read_to_string(&lock_path)?)?;
+		sleep(Duration::from_millis(400));
+		loop_device.detach()?;
+	}
 	remove_file(lock_path)?;
 	Ok(())
 }
@@ -129,7 +137,7 @@ fn start(
 ) -> Result<()> {
 	let root_path = validate_file(root_path, true, true)?;
 	validate_file(root_path.join(shell.as_ref().strip_prefix("/")?), false, true)?;
-	mount(&root_path)?;
+	let automounted = mount(&root_path)?;
 	Command::new("unshare")
 		.env_clear()
 		.env("TERM", "xterm-256color")
@@ -149,7 +157,7 @@ fn start(
 		.spawn()?
 		.wait()?;
 	println!("done");
-	umount(root_path)?;
+	umount(root_path, automounted)?;
 	Ok(())
 }
 
@@ -160,5 +168,6 @@ fn main() -> Result<()> {
 		None,
 		"./ArchLinuxARM-aarch64-latest.tar.gz",
 		"./root",
-	)
+	)?;
+	start("./root", "root", "/bin/sh")
 }
