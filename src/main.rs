@@ -141,7 +141,7 @@ fn start(
 	Command::new("chroot")
 		.env_clear()
 		.env("TERM", "xterm-256color")
-		.args(["-u", user.as_ref(), root_path.to_str().unwrap(), shell.as_ref().to_str().unwrap()])
+		.args([root_path.as_ref(), shell.as_ref()])
 		.stderr(Stdio::inherit())
 		.stdin(Stdio::inherit())
 		.stdout(Stdio::inherit())
