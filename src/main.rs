@@ -123,11 +123,9 @@ fn umount(root_path: impl AsRef<Path>, automounted: bool) -> Result<()> {
 	unmount(&root_path.join("dev"), UnmountFlags::DETACH)?;
 	unmount(&root_path, UnmountFlags::DETACH)?;
 	let lock_path = root_path.parent().unwrap().join("loopdevice.lock");
-	if !automounted {
-		let loop_device = LoopDevice::open(read_to_string(&lock_path)?)?;
-		sleep(Duration::from_millis(400));
-		loop_device.detach()?;
-	}
+	let loop_device = LoopDevice::open(read_to_string(&lock_path)?)?;
+	sleep(Duration::from_millis(400));
+	loop_device.detach()?;
 	remove_file(lock_path)?;
 	Ok(())
 }
