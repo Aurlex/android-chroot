@@ -15,7 +15,7 @@ pub fn validate_file(path: impl AsRef<Path>, directory: bool, exists: bool) -> R
 			anyhow::bail!("File {path:?} already exists.")
 		};
 	}
-	if path.is_dir() != directory {
+	if exists == true && path.is_dir() != directory {
 		if directory {
 			anyhow::bail!("File {path:?} should not be a directory.")
 		} else {
