@@ -1,16 +1,20 @@
 # android-chroot
-automates the process of creating a mountable chroot, designed for android
+automates the process of creating a mountable chroot on android devices in termux
 
 # disclaimer <3
 this could be dangerous. i do not take responsibility for any damage you may cause to your device while using this.
 
 # simple setup
-1. install android-chroot by cloning the repository and installing it with cargo.
-2. find a tarball. this can either be a file, or a URL to download. (or both, to download to a specified path)
-3. cd to the target directory.
-4. run `android-chroot -r ./root install -p /path/to/suitable/rootfs.tar.gz -s 10G`
-5. hope no errors occur.
-6. run `android-chroot start` in the target directory
+1. be rooted
+2. have termux installed
+3. run `yes | (pkg update && pkg upgrade && pkg install rust tsu)`
+4. install android-chroot by cloning the repository and building it with cargo.
+5. find a tarball. this can either be a file, or a URL to download. (or both, to download to a specified path)
+6. cd to the target directory.
+7. run `tsu` and grant superuser permissions
+8. run `android-chroot -r ./root install -p /path/to/suitable/rootfs.tar.gz -s 10G`
+9. hope no errors occur.
+10. run `android-chroot -r ./root start`
 
 # extended features
 - support resizing the chroot
