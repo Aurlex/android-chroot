@@ -7,16 +7,16 @@ use anyhow::Result;
 use flate2::read::GzDecoder;
 use loopdev::{LoopControl, LoopDevice};
 use std::{
-	fs::{create_dir, read_to_string, remove_file, write, File},
+	fs::{create_dir, metadata, read_to_string, remove_file, write, File},
 	io::copy,
 	path::Path,
 	process::{Command, Stdio},
-	time::Duration,
+	thread::spawn,
 };
 use sys_mount::{unmount, Unmount, UnmountFlags};
 use tar::Archive;
 use unbytify::unbytify;
-use ureq::AgentBuilder;
+use ureq::Agent;
 use url::Url;
 
 fn install(
@@ -28,19 +28,21 @@ fn install(
 	let mut path_tar_rootfs = path_tar_rootfs.as_ref().to_path_buf();
 	create_dir(&root_path)?;
 	if let Some(url_rootfs) = url_tar_rootfs {
+		let file_size_bytes: u64 =
+			Agent::new().head(url_rootfs.as_ref()).header("content-length").unwrap().parse()?;
 		path_tar_rootfs = root_path.parent().unwrap().join("rootfs.tar.gz");
-		let mut tar = File::create(&path_tar_rootfs)?;
-		copy(
-			&mut AgentBuilder::new()
-				.timeout_read(Duration::from_secs(5))
-				.timeout_write(Duration::from_secs(5))
-				.build()
-				.get(url_rootfs.as_ref())
-				.call()?
-				.into_reader(),
-			&mut tar,
-		)?;
+		let path = path_tar_rootfs.clone();
+		let mut tar = File::create(&path)?;
+		let handle = spawn(move || -> Result<()> {
+			copy(&mut Agent::new().get(url_rootfs.as_ref()).call()?.into_reader(), &mut tar)?;
+			Ok(())
+		});
+		let metadata = metadata(&path)?;
+		while !handle.is_finished() {
+			println!("{}", 100 * metadata.len() / file_size_bytes);
+		}
 	}
+	// loop {}
 	let tar_gz = File::open(path_tar_rootfs)?;
 	let tar = GzDecoder::new(tar_gz);
 	let mut archive = Archive::new(tar);
@@ -56,23 +58,23 @@ fn install(
 		.wait()?;
 	let loop_device = LoopControl::open()?.next_free()?;
 	loop_device.attach_file(&img_path)?;
-	let _mount = mount_fs(&img_path, &root_path, "ext4")?.into_unmount_drop(UnmountFlags::EXPIRE);
+	let mount = mount_fs(&img_path, &root_path, "ext4")?;
 	archive.unpack(&root_path)?;
 	create_dir(root_path.join("sdcard"))?;
+	mount.unmount(UnmountFlags::EXPIRE)?;
+	loop_device.detach()?;
 	Ok(())
 }
 
 // TODO: this
-// fn resize(new_size: &String, root_path: impl AsRef<Path>) -> Result<()> {
-// 	let root_path = validate_file(root_path, true, true)?;
-// 	let img_path = validate_file(root_path.parent().unwrap().join("disk.img"),
-// false, true)?;
+fn resize(new_size: impl AsRef<str>, root_path: impl AsRef<Path>) -> Result<()> {
+	let root_path = validate_file(root_path, true, true)?;
+	let img_path = validate_file(root_path.parent().unwrap().join("disk.img"), false, true)?;
+	let new_size = unbytify(new_size.as_ref())?;
+	validate_file(root_path.parent().unwrap().join("loopdevice.lock"), false, false)?;
 
-// 	validate_file(root_path.parent().unwrap().join("loopdevice.lock"), false,
-// false)?;
-
-// 	Ok(())
-// }
+	Ok(())
+}
 
 fn mount(root_path: impl AsRef<Path>) -> Result<()> {
 	let root_path = validate_file(root_path, true, true)?;
