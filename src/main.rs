@@ -40,8 +40,9 @@ fn install(
 				"Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:95.0) Gecko/20100101 Firefox/95.0",
 			)
 			.call()?;
+		let url_path = "filename=".to_owned() + url_rootfs.path();
 		let file_name =
-			request.header("Content-Disposition").unwrap().split("filename=").last().unwrap();
+			request.header("Content-Disposition").unwrap_or(&url_path).split("filename=").last().unwrap();
 		let file_size_bytes: u64 = request.header("Content-Length").unwrap().parse()?;
 		path_tar_rootfs = root_path.parent().unwrap().join(file_name);
 		let path = path_tar_rootfs.clone();
