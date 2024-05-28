@@ -11,6 +11,8 @@ use std::{
 	io::{copy, BufReader, BufWriter},
 	path::Path,
 	process::{Command, Stdio},
+	thread::sleep,
+	time::Duration,
 };
 use sys_mount::{unmount, Unmount, UnmountFlags};
 use tar::Archive;
@@ -61,8 +63,11 @@ fn install(
 	let mount = mount_fs(&img_path, &root_path, "ext4")?;
 	archive.unpack(&root_path)?;
 	create_dir(root_path.join("sdcard"))?;
-	mount.unmount(UnmountFlags::FORCE)?;
-	// mount
+	mount.unmount(UnmountFlags::EXPIRE)?;
+	// Not sure what to do about the spin down time.
+	sleep(Duration::from_millis(100));
+	mount.unmount(UnmountFlags::EXPIRE)?;
+	sleep(Duration::from_millis(100));
 	loop_device.detach()?;
 	Ok(())
 }
