@@ -8,19 +8,16 @@ this could be dangerous. i do not take responsibility for any damage you may cau
 1. install android-chroot by cloning the repository and installing it with cargo.
 2. find a tarball. this can either be a file, or a URL to download. (or both, to download to a specified path)
 3. cd to the target directory.
-4. run `android-chroot install --url-rootfs http://some.url.to/rootfs --path-rootfs ./rootfs --disk-img-path ./disk.img --root-path ./root/ --fs-type ext4`
+4. run `android-chroot -r ./root install -p /path/to/suitable/rootfs.tar.gz -s 10G`
 5. hope no errors occur.
 6. run `android-chroot start` in the target directory
 
 # extended features
 - support resizing the chroot
     - danger: could cause loss of data
-    - `android-chroot resize --new-size size`
+    - `android-chroot resize NEW_SIZE`
 - support mounting and unmounting the chroot
-    - `android-chroot mount` and `android-chroot umount`
-- support arbitrary file systems
-    - simply choose `--fs-type`
-    - i am not sure if this has any performance impact
+    - `android-chroot -r ./root mount` and `android-chroot -r ./root umount`
 - creation of local file `android-chroot.toml`
     - so arguments do not need to be specified at each startup
     - automated on install
