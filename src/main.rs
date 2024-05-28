@@ -11,7 +11,8 @@ use std::{
 	io::copy,
 	path::Path,
 	process::{Command, Stdio},
-	thread::spawn,
+	thread::{sleep, spawn},
+	time::Duration,
 };
 use sys_mount::{unmount, Unmount, UnmountFlags};
 use tar::Archive;
@@ -36,9 +37,10 @@ fn install(
 			copy(&mut request.into_reader(), &mut tar)?;
 			Ok(())
 		});
-		let metadata = metadata(&path)?;
 		while !handle.is_finished() {
+			let metadata = metadata(&path)?;
 			println!("{}", 100 * metadata.len() / file_size_bytes);
+			sleep(Duration::from_secs(1));
 		}
 	}
 	let tar_gz = File::open(path_tar_rootfs)?;
