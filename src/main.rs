@@ -25,9 +25,8 @@ fn install(
 ) -> Result<()> {
 	let root_path = validate_file(root_path, false, false)?;
 	let img_path = validate_file(root_path.parent().unwrap().join("disk.img"), false, false)?;
-	let mut path_tar_rootfs = path_tar_rootfs.as_ref().canonicalize()?;
+	let mut path_tar_rootfs = path_tar_rootfs.as_ref().to_path_buf();
 	create_dir(&root_path)?;
-	path_tar_rootfs.set_extension("tar.gz");
 	if let Some(url_rootfs) = url_tar_rootfs {
 		path_tar_rootfs = root_path.parent().unwrap().join("rootfs.tar.gz");
 		let mut tar = File::create(&path_tar_rootfs)?;
