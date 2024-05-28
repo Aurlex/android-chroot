@@ -7,7 +7,7 @@ use sys_mount::{Mount, MountFlags};
 
 #[inline(always)]
 pub fn validate_file(path: impl AsRef<Path>, directory: bool, exists: bool) -> Result<PathBuf> {
-	let path = path.as_ref().canonicalize()?;
+	let path = path.as_ref();
 	if path.try_exists()? != exists {
 		if exists {
 			anyhow::bail!("File {path:?} does not exist when it should.")
@@ -22,7 +22,7 @@ pub fn validate_file(path: impl AsRef<Path>, directory: bool, exists: bool) -> R
 			anyhow::bail!("File {path:?} should be a directory.")
 		};
 	}
-	Ok(path)
+	Ok(path.canonicalize()?)
 }
 #[inline(always)]
 pub fn mount_bind(from: impl AsRef<Path>, to: impl AsRef<Path>) -> Result<Mount> {
