@@ -1,0 +1,13 @@
+[package]
+name = "android-chroot"
+description = "Automates the process of creating a chroot, designed for android."
+authors = ["Aurlex <aurlex1@gmail.com>"]
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+sys-mount = "3"
+serde = { version = "1", features = ["derive"] }
+clap = { version = "4", features = ["derive"] }
+toml = "0.8"
+url = { version = "2", features = ["serde"] }
