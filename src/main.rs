@@ -61,7 +61,7 @@ fn install(
 	let mount = mount_fs(&img_path, &root_path, "ext4")?;
 	archive.unpack(&root_path)?;
 	create_dir(root_path.join("sdcard"))?;
-	mount.unmount(UnmountFlags::EXPIRE)?;
+	mount.unmount(UnmountFlags::FORCE)?;
 	// mount
 	loop_device.detach()?;
 	Ok(())
