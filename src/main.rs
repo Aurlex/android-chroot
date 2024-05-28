@@ -101,10 +101,10 @@ fn mount(root_path: impl AsRef<Path>) -> Result<bool> {
 		(LoopDevice::open(mount.backing_loop_device().unwrap())?, true)
 	};
 	mount_bind("/dev", &root_path.join("dev"))?;
-	mount_fs("proc", &root_path.join("proc"), "proc")?;
-	mount_fs("sysfs", &root_path.join("sys"), "sysfs")?;
-	mount_fs("tmpfs", &root_path.join("tmp"), "tmpfs")?;
-	mount_fs("devpts", &root_path.join("dev/pts"), "devpts")?;
+	mount_fs("/proc", &root_path.join("proc"), "proc")?;
+	mount_fs("/sys", &root_path.join("sys"), "sysfs")?;
+	mount_fs("/data/local/tmp", &root_path.join("tmp"), "tmpfs")?;
+	mount_fs("/dev/pts", &root_path.join("dev/pts"), "devpts")?;
 	mount_bind("/sdcard", &root_path.join("sdcard"))?;
 	write(
 		root_path.parent().unwrap().join("loopdevice.lock"),
