@@ -17,6 +17,7 @@ this could be dangerous. i do not take responsibility for any damage you may cau
 10. run `android-chroot -r ./root start`
 
 # extended features
+- [ ] support X11
 - [ ] support resizing the chroot
     - danger: could cause loss of data
     - `android-chroot resize NEW_SIZE`
