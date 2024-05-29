@@ -5,6 +5,7 @@ use android_chroot::{mount_bind, mount_fs, mount_loop, validate_file, Args};
 use anyhow::{bail, Result};
 use clap::Parser;
 use flate2::bufread::GzDecoder;
+use gethostname::gethostname;
 use loopdev::{LoopControl, LoopDevice};
 use std::{
 	fs::{create_dir, read_to_string, remove_dir, remove_file, write, File},
@@ -92,7 +93,7 @@ fn install(
 	create_dir(root_path.join("sdcard"))?;
 	remove_file(root_path.join("etc/resolv.conf"))?;
 	write("etc/hosts.conf", read_to_string("/etc/hosts.conf")?)?;
-	write("etc/hostname.conf", read_to_string("/etc/hostname.conf")?)?;
+	write("etc/hostname.conf", gethostname().as_encoded_bytes())?;
 	println!("Unomunting disk.img");
 	mount.unmount(UnmountFlags::DETACH)?;
 	// Not sure what to do about the spin down time.
