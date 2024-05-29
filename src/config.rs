@@ -48,7 +48,7 @@ impl Args {
 		self.root_path.as_ref().context("Root path not set. Set it with -r")?;
 		match self.command {
 			| Command::Install { ref url_rootfs, ref path_rootfs, .. } => {
-				(url_rootfs.is_some() && path_rootfs.is_some())
+				(url_rootfs.is_some() || path_rootfs.is_some())
 					.then(|| {})
 					.context("One of either url_rootfs or path_rootfs must be set")?;
 			},
