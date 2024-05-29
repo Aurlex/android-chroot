@@ -10,11 +10,13 @@ loopdev-3 = "0.5"
 sys-mount = "3"
 unbytify = "0.2"
 anyhow = "1"
-serde = { version = "1", features = ["derive"] }
-clap = { version = "4", features = ["derive"] }
-toml = "0.8"
+flate2 = { version = "1", default-features = false, features = ["miniz-sys"] }
+clap = { version = "4", default-features = false, features = [
+  "derive",
+  "std",
+  "usage",
+  "error-context",
+] }
 ureq = { version = "2", default-features = false, features = ["tls"] }
-url = { version = "2", features = ["serde"] }
-tar = "0.4"
-flate2 = "1.0.30"
-gethostname = "0.4.3"
+url = "2"
+tar = { version = "0.4", default-features = false }
