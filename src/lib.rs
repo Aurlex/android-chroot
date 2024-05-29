@@ -32,13 +32,19 @@ pub fn mount_loop(
 ) -> Result<Mount> {
 	let from = validate_file(from, None, true)?;
 	let to = validate_file(to, None, true)?;
-	Ok(Mount::builder().fstype(fs.as_ref()).explicit_loopback().mount(from, to)?)
+	Ok(
+		Mount::builder()
+			.fstype(fs.as_ref())
+			.flags(MountFlags::NOATIME)
+			.explicit_loopback()
+			.mount(from, to)?,
+	)
 }
 #[inline(always)]
 pub fn mount_bind(from: impl AsRef<Path>, to: impl AsRef<Path>) -> Result<Mount> {
 	let from = validate_file(from, None, true)?;
 	let to = validate_file(to, None, true)?;
-	Ok(Mount::builder().flags(MountFlags::BIND).mount(from, to)?)
+	Ok(Mount::builder().flags(MountFlags::BIND | MountFlags::NOATIME).mount(from, to)?)
 }
 #[inline(always)]
 pub fn mount_fs(
@@ -46,5 +52,5 @@ pub fn mount_fs(
 ) -> Result<Mount> {
 	let from = validate_file(from, None, true)?;
 	let to = validate_file(to, None, true)?;
-	Ok(Mount::builder().fstype(fs.as_ref()).mount(from, to)?)
+	Ok(Mount::builder().fstype(fs.as_ref()).flags(MountFlags::NOATIME).mount(from, to)?)
 }

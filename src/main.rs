@@ -8,7 +8,7 @@ use flate2::bufread::GzDecoder;
 use loopdev::{LoopControl, LoopDevice};
 use std::{
 	fs::{create_dir, read_to_string, remove_dir, remove_file, write, File},
-	io::{copy, BufReader, BufWriter},
+	io::{copy, BufReader, BufWriter, Read},
 	path::Path,
 	process::{Command, Stdio},
 	thread::sleep,
@@ -41,6 +41,7 @@ fn install(
 		let mut tar = File::create(&path)?;
 		println!("Downloading: {file_name}, {file_size}{ext}.");
 		copy(&mut request.into_reader(), &mut BufWriter::new(&mut tar))?;
+		println!("Finished Download.");
 	} else {
 		path = path_tar_rootfs.unwrap().as_ref().to_path_buf();
 	}
@@ -51,13 +52,33 @@ fn install(
 	let size_bytes = unbytify(root_size.as_ref())?;
 	let disk_img = File::create(&img_path)?;
 	disk_img.set_len(size_bytes)?;
-	Command::new("mkfs")
+	println!("Formatting disk.img");
+	Command::new("mke2fs")
 		.args(["-t", "ext4", img_path.to_str().unwrap()])
 		.stderr(Stdio::null())
 		.stdout(Stdio::null())
 		.spawn()?
 		.wait()?;
+	Command::new("tune2fs")
+		.args(["-o", "journal_data_writeback", img_path.to_str().unwrap()])
+		.stderr(Stdio::null())
+		.stdout(Stdio::null())
+		.spawn()?
+		.wait()?;
+	Command::new("tune2fs")
+		.args(["-O", "^has_journal", img_path.to_str().unwrap()])
+		.stderr(Stdio::null())
+		.stdout(Stdio::null())
+		.spawn()?
+		.wait()?;
+	Command::new("e2fsck")
+		.args(["-f", img_path.to_str().unwrap()])
+		.stderr(Stdio::null())
+		.stdout(Stdio::null())
+		.spawn()?
+		.wait()?;
 	create_dir(&root_path)?;
+	println!("Mounting disk.img");
 	let mount = mount_loop(&img_path, &root_path, "ext4")?;
 	let (loop_device, automounted) = if mount.backing_loop_device().is_none() {
 		let loop_device = LoopControl::open()?.next_free()?;
@@ -66,14 +87,17 @@ fn install(
 	} else {
 		(LoopDevice::open(mount.backing_loop_device().unwrap())?, true)
 	};
+	println!("Unpacking RootFS");
 	archive.unpack(&root_path)?;
 	create_dir(root_path.join("sdcard"))?;
+	println!("Unomunting disk.img");
 	mount.unmount(UnmountFlags::DETACH)?;
 	// Not sure what to do about the spin down time.
 	if !automounted {
 		sleep(Duration::from_millis(400));
 		loop_device.detach()?;
 	}
+	println!("Done");
 	Ok(())
 }
 
@@ -83,6 +107,7 @@ fn _resize(_new_size: impl AsRef<str>, _root_path: impl AsRef<Path>) -> Result<(
 fn mount(root_path: impl AsRef<Path>) -> Result<()> {
 	let root_path = validate_file(root_path, Some(true), true)?;
 	let img_path = validate_file(root_path.parent().unwrap().join("disk.img"), Some(false), true)?;
+	println!("Mounting disk.img");
 	let mount = mount_loop(&img_path, &root_path, "ext4")?;
 	let loop_device = if mount.backing_loop_device().is_none() {
 		let loop_device = LoopControl::open()?.next_free()?;
@@ -101,6 +126,13 @@ fn mount(root_path: impl AsRef<Path>) -> Result<()> {
 		root_path.parent().unwrap().join("loopdevice.lock"),
 		loop_device.path().unwrap().to_str().unwrap(),
 	)?;
+	Command::new("fstrim")
+		.args(["-av", img_path.to_str().unwrap()])
+		.stderr(Stdio::null())
+		.stdout(Stdio::null())
+		.spawn()?
+		.wait()?;
+	println!("Done");
 	Ok(())
 }
 
@@ -109,16 +141,24 @@ fn umount(root_path: impl AsRef<Path>) -> Result<()> {
 	let lock_path =
 		validate_file(root_path.parent().unwrap().join("loopdevice.lock"), Some(false), true)?;
 	let loop_device = LoopDevice::open(read_to_string(&lock_path)?)?;
+	println!("Unmounting: sdcard");
 	unmount(&root_path.join("sdcard"), UnmountFlags::DETACH)?;
+	println!("Unmounting: dev/pts");
 	unmount(&root_path.join("dev/pts"), UnmountFlags::DETACH)?;
+	println!("Unmounting: tmp");
 	unmount(&root_path.join("tmp"), UnmountFlags::DETACH)?;
+	println!("Unmounting: sys");
 	unmount(&root_path.join("sys"), UnmountFlags::DETACH)?;
+	println!("Unmounting: proc");
 	unmount(&root_path.join("proc"), UnmountFlags::DETACH)?;
+	println!("Unmounting: dev");
 	unmount(&root_path.join("dev"), UnmountFlags::DETACH)?;
+	println!("Unmounting: root");
 	unmount(&root_path, UnmountFlags::DETACH)?;
 	sleep(Duration::from_millis(400));
 	loop_device.detach()?;
 	remove_file(lock_path)?;
+	println!("Done");
 	Ok(())
 }
 
@@ -128,6 +168,7 @@ fn start(
 	let root_path = validate_file(root_path, Some(true), true)?;
 	mount(&root_path)?;
 	validate_file(root_path.join(shell.as_ref().strip_prefix("/")?), Some(false), true)?;
+	println!("Starting chroot");
 	Command::new("chroot")
 		.env_clear()
 		.env("TERM", "xterm-256color")
@@ -137,7 +178,7 @@ fn start(
 		.stdout(Stdio::inherit())
 		.spawn()?
 		.wait()?;
-	println!("done");
+	println!("Done");
 	umount(root_path)?;
 	Ok(())
 }
@@ -146,8 +187,18 @@ fn remove(root_path: impl AsRef<Path>) -> Result<()> {
 	let root_path = validate_file(root_path, Some(true), true)?;
 	let img_path = validate_file(root_path.parent().unwrap().join("disk.img"), Some(false), true)?;
 	validate_file(root_path.parent().unwrap().join("loopdevice.lock"), Some(false), false)?;
-	remove_dir(root_path)?;
-	remove_file(img_path)?;
+	let mut buf = [0u8];
+	println!("Are you sure you want to delete {}? [y/N]", root_path.to_str().unwrap());
+	std::io::stdin().read_exact(&mut buf)?;
+	match buf[0] as char {
+		| 'y' | 'Y' => {
+			println!("Deleting");
+			remove_dir(root_path)?;
+			remove_file(img_path)?;
+		},
+		| _ => println!("Not deleting"),
+	}
+	println!("Done");
 	Ok(())
 }
 
