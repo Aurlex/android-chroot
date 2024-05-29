@@ -91,9 +91,9 @@ fn install(
 	println!("Unpacking RootFS");
 	archive.unpack(&root_path)?;
 	create_dir(root_path.join("sdcard"))?;
-	write("etc/resolv.conf", read_to_string("/etc/resolv.conf")?)?;
-	write("etc/hosts", read_to_string("/etc/hosts")?)?;
-	write("etc/hostname.conf", gethostname().as_encoded_bytes())?;
+	write(root_path.parent().unwrap().join("etc/resolv.conf"), read_to_string("/etc/resolv.conf")?)?;
+	write(root_path.parent().unwrap().join("etc/hosts"), read_to_string("/etc/hosts")?)?;
+	write(root_path.parent().unwrap().join("etc/hostname.conf"), gethostname().as_encoded_bytes())?;
 	println!("Unomunting disk.img");
 	mount.unmount(UnmountFlags::DETACH)?;
 	// Not sure what to do about the spin down time.
