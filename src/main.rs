@@ -21,25 +21,30 @@ use ureq::get;
 use url::Url;
 
 fn install(
-	root_size: impl AsRef<str>, url_tar_rootfs: Option<Url>, path_tar_rootfs: impl AsRef<Path>,
-	root_path: impl AsRef<Path>,
+	root_size: impl AsRef<str>, url_tar_rootfs: Option<Url>,
+	path_tar_rootfs: Option<impl AsRef<Path>>, root_path: impl AsRef<Path>,
 ) -> Result<()> {
 	let root_path = validate_file(root_path, Some(false), false)?;
 	let img_path = validate_file(root_path.parent().unwrap().join("disk.img"), Some(false), false)?;
-	let mut path_tar_rootfs = path_tar_rootfs.as_ref().to_path_buf();
+	if path_tar_rootfs.is_none() && url_tar_rootfs.is_none() {
+		bail!("Either path_rootfs or url_rootfs must be set.")
+	}
+	let path;
 	if let Some(url_rootfs) = url_tar_rootfs {
 		let request = get(url_rootfs.as_ref()).call()?;
 		let url_path = "filename=".to_owned() + url_rootfs.path_segments().unwrap().last().unwrap();
 		let file_name =
 			request.header("Content-Disposition").unwrap_or(&url_path).split("filename=").last().unwrap();
 		let (file_size, ext) = bytify(request.header("Content-Length").unwrap().parse()?);
-		path_tar_rootfs = root_path.parent().unwrap().join(file_name);
-		let path = path_tar_rootfs.clone();
+		path = root_path.parent().unwrap().join(file_name);
+		// let path = path_tar_rootfs.clone();
 		let mut tar = File::create(&path)?;
 		println!("Downloading: {file_name}, {file_size}{ext}.");
 		copy(&mut request.into_reader(), &mut BufWriter::new(&mut tar))?;
+	} else {
+		path = path_tar_rootfs.unwrap().as_ref().to_path_buf();
 	}
-	let tar_gz = BufReader::new(File::open(path_tar_rootfs)?);
+	let tar_gz = BufReader::new(File::open(path)?);
 	let tar = GzDecoder::new(tar_gz);
 	let mut archive = Archive::new(tar);
 
@@ -150,12 +155,9 @@ fn main() -> Result<()> {
 	let args = Args::parse().validate()?;
 	use android_chroot::Command::*;
 	match args.command {
-		| Install { ref size_root, ref url_rootfs, ref path_rootfs } => install(
-			size_root,
-			url_rootfs.clone(),
-			path_rootfs.as_ref().unwrap(),
-			&args.root_path.unwrap(),
-		),
+		| Install { ref size_root, ref url_rootfs, ref path_rootfs } => {
+			install(size_root, url_rootfs.clone(), path_rootfs.clone(), &args.root_path.unwrap())
+		},
 		| Mount => mount(&args.root_path.unwrap()),
 		| Umount => umount(&args.root_path.unwrap()),
 		| Start { ref shell } => {
