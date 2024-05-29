@@ -2,8 +2,8 @@ use anyhow::Result;
 use std::path::{Path, PathBuf};
 use sys_mount::{Mount, MountFlags};
 
-// mod config;
-// pub use config::*;
+mod config;
+pub use config::*;
 
 #[inline(always)]
 pub fn validate_file(

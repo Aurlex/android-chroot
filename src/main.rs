@@ -1,13 +1,13 @@
-// #[cfg(not(any(target_os = "android", debug_assertions)))]
-// compile_error!("Only android is supported");
+#[cfg(not(any(target_os = "android", debug_assertions)))]
+compile_error!("Only android is supported");
 
-use android_chroot::{mount_bind, mount_fs, mount_loop, validate_file /* , Arguments */};
-use anyhow::Result;
-// use clap::Parser;
+use android_chroot::{mount_bind, mount_fs, mount_loop, validate_file, Args};
+use anyhow::{bail, Result};
+use clap::Parser;
 use flate2::bufread::GzDecoder;
 use loopdev::{LoopControl, LoopDevice};
 use std::{
-	fs::{create_dir, read_to_string, remove_file, write, File},
+	fs::{create_dir, read_to_string, remove_dir, remove_file, write, File},
 	io::{copy, BufReader, BufWriter},
 	path::Path,
 	process::{Command, Stdio},
@@ -28,12 +28,7 @@ fn install(
 	let img_path = validate_file(root_path.parent().unwrap().join("disk.img"), Some(false), false)?;
 	let mut path_tar_rootfs = path_tar_rootfs.as_ref().to_path_buf();
 	if let Some(url_rootfs) = url_tar_rootfs {
-		let request = get(url_rootfs.as_ref())
-			.set(
-				"User-Agent",
-				"Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:95.0) Gecko/20100101 Firefox/95.0",
-			)
-			.call()?;
+		let request = get(url_rootfs.as_ref()).call()?;
 		let url_path = "filename=".to_owned() + url_rootfs.path_segments().unwrap().last().unwrap();
 		let file_name =
 			request.header("Content-Disposition").unwrap_or(&url_path).split("filename=").last().unwrap();
@@ -51,16 +46,14 @@ fn install(
 	let size_bytes = unbytify(root_size.as_ref())?;
 	let disk_img = File::create(&img_path)?;
 	disk_img.set_len(size_bytes)?;
-	Command::new("mke2fs")
+	Command::new("mkfs")
 		.args(["-t", "ext4", img_path.to_str().unwrap()])
 		.stderr(Stdio::null())
 		.stdout(Stdio::null())
 		.spawn()?
 		.wait()?;
 	create_dir(&root_path)?;
-	// loop_device.attach_file(&img_path)?;
 	let mount = mount_loop(&img_path, &root_path, "ext4")?;
-	// let loop_device = mount.backing_loop_device().unwrap();
 	let (loop_device, automounted) = if mount.backing_loop_device().is_none() {
 		let loop_device = LoopControl::open()?.next_free()?;
 		loop_device.attach_file(&img_path)?;
@@ -80,25 +73,18 @@ fn install(
 }
 
 // TODO: this
-fn resize(new_size: impl AsRef<str>, root_path: impl AsRef<Path>) -> Result<()> {
-	let root_path = validate_file(root_path, Some(true), true)?;
-	let img_path = validate_file(root_path.parent().unwrap().join("disk.img"), Some(false), true)?;
-	let new_size = unbytify(new_size.as_ref())?;
-	validate_file(root_path.parent().unwrap().join("loopdevice.lock"), Some(false), false)?;
+fn _resize(_new_size: impl AsRef<str>, _root_path: impl AsRef<Path>) -> Result<()> { todo!() }
 
-	Ok(())
-}
-
-fn mount(root_path: impl AsRef<Path>) -> Result<bool> {
+fn mount(root_path: impl AsRef<Path>) -> Result<()> {
 	let root_path = validate_file(root_path, Some(true), true)?;
 	let img_path = validate_file(root_path.parent().unwrap().join("disk.img"), Some(false), true)?;
 	let mount = mount_loop(&img_path, &root_path, "ext4")?;
-	let (loop_device, automounted) = if mount.backing_loop_device().is_none() {
+	let loop_device = if mount.backing_loop_device().is_none() {
 		let loop_device = LoopControl::open()?.next_free()?;
 		loop_device.attach_file(&img_path)?;
-		(loop_device, false)
+		loop_device
 	} else {
-		(LoopDevice::open(mount.backing_loop_device().unwrap())?, true)
+		LoopDevice::open(mount.backing_loop_device().unwrap())?
 	};
 	mount_bind("/dev", &root_path.join("dev"))?;
 	mount_fs("/proc", &root_path.join("proc"), "proc")?;
@@ -110,11 +96,14 @@ fn mount(root_path: impl AsRef<Path>) -> Result<bool> {
 		root_path.parent().unwrap().join("loopdevice.lock"),
 		loop_device.path().unwrap().to_str().unwrap(),
 	)?;
-	Ok(automounted)
+	Ok(())
 }
 
-fn umount(root_path: impl AsRef<Path>, automounted: bool) -> Result<()> {
+fn umount(root_path: impl AsRef<Path>) -> Result<()> {
 	let root_path = validate_file(root_path, Some(true), true)?;
+	let lock_path =
+		validate_file(root_path.parent().unwrap().join("loopdevice.lock"), Some(false), true)?;
+	let loop_device = LoopDevice::open(read_to_string(&lock_path)?)?;
 	unmount(&root_path.join("sdcard"), UnmountFlags::DETACH)?;
 	unmount(&root_path.join("dev/pts"), UnmountFlags::DETACH)?;
 	unmount(&root_path.join("tmp"), UnmountFlags::DETACH)?;
@@ -122,8 +111,6 @@ fn umount(root_path: impl AsRef<Path>, automounted: bool) -> Result<()> {
 	unmount(&root_path.join("proc"), UnmountFlags::DETACH)?;
 	unmount(&root_path.join("dev"), UnmountFlags::DETACH)?;
 	unmount(&root_path, UnmountFlags::DETACH)?;
-	let lock_path = root_path.parent().unwrap().join("loopdevice.lock");
-	let loop_device = LoopDevice::open(read_to_string(&lock_path)?)?;
 	sleep(Duration::from_millis(400));
 	loop_device.detach()?;
 	remove_file(lock_path)?;
@@ -131,10 +118,10 @@ fn umount(root_path: impl AsRef<Path>, automounted: bool) -> Result<()> {
 }
 
 fn start(
-	root_path: impl AsRef<Path>, user: impl AsRef<str>, shell: impl AsRef<Path>,
+	root_path: impl AsRef<Path>, _user: impl AsRef<str>, shell: impl AsRef<Path>,
 ) -> Result<()> {
 	let root_path = validate_file(root_path, Some(true), true)?;
-	let automounted = mount(&root_path)?;
+	mount(&root_path)?;
 	validate_file(root_path.join(shell.as_ref().strip_prefix("/")?), Some(false), true)?;
 	Command::new("chroot")
 		.env_clear()
@@ -146,17 +133,33 @@ fn start(
 		.spawn()?
 		.wait()?;
 	println!("done");
-	umount(root_path, automounted)?;
+	umount(root_path)?;
+	Ok(())
+}
+
+fn remove(root_path: impl AsRef<Path>) -> Result<()> {
+	let root_path = validate_file(root_path, Some(true), true)?;
+	let img_path = validate_file(root_path.parent().unwrap().join("disk.img"), Some(false), true)?;
+	validate_file(root_path.parent().unwrap().join("loopdevice.lock"), Some(false), false)?;
+	remove_dir(root_path)?;
+	remove_file(img_path)?;
 	Ok(())
 }
 
 fn main() -> Result<()> {
-	install(
-		"10G",
-		// Some("https://fl.us.mirror.archlinuxarm.org/os/ArchLinuxARM-aarch64-latest.tar.gz".try_into()?),
-		None,
-		"./ArchLinuxARM-aarch64-latest.tar.gz",
-		"./root",
-	)?;
-	start("./root", "root", "/bin/sh")
+	let args = Args::parse().validate()?;
+	use android_chroot::Command::*;
+	match args.command {
+		| Install { ref size_root, ref url_rootfs, ref path_rootfs } => install(
+			size_root,
+			url_rootfs.clone(),
+			path_rootfs.as_ref().unwrap(),
+			&args.root_path.unwrap(),
+		),
+		| Mount => mount(&args.root_path.unwrap()),
+		| Umount => umount(&args.root_path.unwrap()),
+		| Start { ref shell } => start(&args.root_path.unwrap(), "", shell.as_ref().unwrap()),
+		| Remove => remove(&args.root_path.unwrap()),
+		| _ => bail!("How did you get here?"),
+	}
 }
