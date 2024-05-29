@@ -1,1 +1,5 @@
-1. rewrite config validation to use separate structs for Arguments & Config for clearer feedback.
+- Support X11
+- Create resize tool
+- Handle more edge cases
+- Auto umount on error
+- Improve performance
