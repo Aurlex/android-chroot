@@ -91,8 +91,8 @@ fn install(
 	println!("Unpacking RootFS");
 	archive.unpack(&root_path)?;
 	create_dir(root_path.join("sdcard"))?;
-	remove_file(root_path.join("etc/resolv.conf"))?;
-	write("etc/hosts.conf", read_to_string("/etc/hosts.conf")?)?;
+	write("etc/resolv.conf", read_to_string("/etc/resolv.conf")?)?;
+	write("etc/hosts", read_to_string("/etc/hosts")?)?;
 	write("etc/hostname.conf", gethostname().as_encoded_bytes())?;
 	println!("Unomunting disk.img");
 	mount.unmount(UnmountFlags::DETACH)?;
