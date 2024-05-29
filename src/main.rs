@@ -90,6 +90,9 @@ fn install(
 	println!("Unpacking RootFS");
 	archive.unpack(&root_path)?;
 	create_dir(root_path.join("sdcard"))?;
+	remove_file(root_path.join("etc/resolv.conf"))?;
+	write("etc/hosts.conf", read_to_string("/etc/hosts.conf")?)?;
+	write("etc/hostname.conf", read_to_string("/etc/hostname.conf")?)?;
 	println!("Unomunting disk.img");
 	mount.unmount(UnmountFlags::DETACH)?;
 	// Not sure what to do about the spin down time.
