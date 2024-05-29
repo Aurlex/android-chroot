@@ -158,7 +158,9 @@ fn main() -> Result<()> {
 		),
 		| Mount => mount(&args.root_path.unwrap()),
 		| Umount => umount(&args.root_path.unwrap()),
-		| Start { ref shell } => start(&args.root_path.unwrap(), "", shell.as_ref().unwrap()),
+		| Start { ref shell } => {
+			start(&args.root_path.unwrap(), "", shell.as_ref().unwrap_or(&"/bin/bash".try_into()?))
+		},
 		| Remove => remove(&args.root_path.unwrap()),
 		| _ => bail!("How did you get here?"),
 	}
